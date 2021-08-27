@@ -1,2 +1,2 @@
 #!/bin/bash
-pm2 restart server
+pm2 restart server.js
