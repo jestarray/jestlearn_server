@@ -1,0 +1,3 @@
+[submodule "jestlearn"]
+	path = jestlearn
+	url = https://github.com/jestarray/jestlearn.git
