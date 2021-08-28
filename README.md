@@ -1,5 +1,5 @@
 # jestlearn_server
-Set up this server to enable syncing across devices
+Set up this server to enable syncing across devices! If not, just distribute jestlearn using github pages or something since it can work without this server
 ## Deploying
 > Steps to deploy a Node.js app to a VPS using PM2, NGINX as a reverse proxy and an SSL from LetsEncrypt
 

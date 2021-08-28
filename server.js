@@ -117,7 +117,6 @@ function diff_latest(set_a, set_b) {
 	return res;
 }
 
-//just call this sync?
 app.post('/sync', (req, res) => {
 	let query = get_user_data(req.body.username);
 	let problems_from_client = req.body.problem_sets;
@@ -165,4 +164,47 @@ app.post('/sync', (req, res) => {
 		res.send({username:req.body.username, date_created: account_creation_date, problems: []});
 		//new_user.run(req.body.username, "192.168.1.1");
 	}
+});
+
+///replace spaces with underscores and lower cases the name
+function convert_to_hash(st) {
+  let regex = / /gi;
+  let replace_spaces = st.replace(regex, "_");
+  let res = replace_spaces.toLowerCase();
+  return res;
+}
+//all we need is the public folders and some unused rootpath
+//note: root dir must be synced with the jestlearn COURSE_NAME
+let courses_on_this_site = [
+{path: "./jestlearn/public", course_name: "Example Course"},
+{path: "./computer_systems_public", course_name: "Computer Systems"}];
+
+let hosted = courses_on_this_site.map((val)=>{
+	//host the courses on their respective root paths
+	app.use(`/${convert_to_hash(val.course_name)}`, express.static(val.path));
+	const test_url = "http://localhost:3000";
+	const prod_url = "https://jestlearn.com";
+	return `<li><a href="${prod_url}/${convert_to_hash(val.course_name)}/">${val.course_name}</a></li>`
+});
+
+//order matters! do not put this .use() on top as it will match first, instead we want this to map last for a given url
+app.use('/', (req, res) => {
+	//list all courses on this website and include the source
+	//https://github.com/jestarray/jestlearn
+	res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jestlearn courses</title>
+</head>
+<body>
+	<h1>Courses on this site: </h1>
+    <ul>
+	${hosted.reduce((prev, curr) => prev + curr)}
+	</ul>
+	<a href="https://github.com/jestarray/jestlearn">Source Code</a>
+</body>
+</html>`)
 });
