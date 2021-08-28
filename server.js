@@ -80,7 +80,7 @@ function insert_problem_data(problem, user_id, course_name) {
 
 function archive(problem, user_id, course_name) {
 	//todo: check if there are any current problems and resolve the diff via time stamps in another function 
-	let insert_problem = db.prepare(`INSERT INTO archive (title, id, problem_index, problems, emoji_mark, last_updated, user_id, course_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+	let insert_problem = db.prepare(`INSERT INTO archive (title, id, problem_index, problems, emoji_mark, last_updated, user_id, course_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
 	//console.log(problem, user_id);
 	for(let item of problem) {
 		insert_problem.run(item.title, item.id, item.problem_index, JSON.stringify(item.problems), item.emoji_mark, item.last_updated, user_id, course_name);
