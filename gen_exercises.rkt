@@ -92,7 +92,7 @@
 (define (gen-exercise mn)
   (cond
     [(= 0 mn) (define ranmath (gen-ran-arith-problem 5))
-              (define prob (problem "input" (wrap-prism-js (~a ranmath)) (eval ranmath ns) "input a number eg 33" "?"))
+              (define prob (problem "input" (wrap-prism-js (~a ranmath)) (eval ranmath ns) "input a number eg 33" "❓"))
               (problem->jsexpr prob)]
     [else
      ; (println "invalid exercise id, defaulting to 0")
