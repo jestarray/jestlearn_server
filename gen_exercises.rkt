@@ -85,7 +85,7 @@
                  "</code></pre>"))
 
 (define (wrap-prism-js str)
-  (cond [(= disable-prism 0) (wrap-html str)]
+  (cond [(= (disable-prism) 0) (wrap-html str)]
         [else str]))
 
 ; Number -> JSON
