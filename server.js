@@ -132,7 +132,7 @@ function diff_latest(set_a, set_b) {
   for (const item of smaller) {
     let is_unique = true;
     for (const item2 of bigger) {
-      if (item.id === item2.id || item.title === item2.title) {
+      if (item.title === item2.title) {
         is_unique = false;
         break;
       }
@@ -276,6 +276,7 @@ app.use("/", (req, res) => {
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "94ff6f49ae794e9fb35547e18ce0d8de"}'></script><!-- End Cloudflare Web Analytics -->
     <title>jestlearn courses</title>
 </head>
 <body>
