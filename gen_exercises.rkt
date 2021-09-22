@@ -129,25 +129,20 @@
                     (infix operand)))))]
     [x x]))
 
-
-(define (add-range output low high)
-  (cons (if (equal? low high) low (list low high)) output))
-
 ;; (rangify '(8 1 6 7 8 9 4 2))
-;; produces '(8 1 (6 9) 4 2)
-;credits to notjack#9941 from racket discord
-(define (rangify integers)
-  (cond
-    [(empty? integers) '()]
-    [else
-     (for/fold ([output '()]
-                [low (first integers)]
-                [high (first integers)]
-                #:result (reverse (add-range output low high)))
-               ([x (in-list integers)])
-       (if (<= (sub1 low) x (add1 high))
-           (values output (min low x) (max high x))
-           (values (add-range output low high) x x)))]))
+;; produces '(8 1 (6 . 9) 4 2)
+;; (7 4 3 2) -> (7 4 3 2)
+;credits to samph#0815 from racket discord
+(define (rangify a-list)
+  (match a-list
+    [(list)   null]
+    [(list _) a-list]
+    [(or (list (cons a b) c rest ...)
+         (list (and a b) c rest ...))
+     (if (= 1 (- c b))
+         (rangify (cons (cons a c) rest))
+         (cons (car a-list)
+               (rangify (cdr a-list))))]))
 
 ; typeof, string=? , arithmetic comparisons
 ; Number -> List<symbols>
@@ -258,6 +253,8 @@
                                      (read p))))
                 (define ran-index (random (length anagrams)))
                 (define q&a (list-ref anagrams ran-index))
+                ; (define q&a (list "lunacies" (list "scan")))
+                ; (println q&a)
                 (define orig-wd (car q&a))
                 (define ana-list (cadr q&a))
                 (define rand-ana (list-ref ana-list (random (length ana-list))))
@@ -268,7 +265,8 @@
                 (define ana-sexp (map (lambda (ch) (index-of (string->list orig-wd) ch)) (string->list rand-ana)))
                 (define ranges (map (lambda (v)
                                       (cond [(number? v) (list 'substring ran-var-name v (add1 v))]
-                                            [else (list 'substring ran-var-name (car v) (add1 (cadr v)))])) (rangify ana-sexp)))
+                                            [else (list 'substring ran-var-name (car v) (add1 (cdr v)))])) (rangify ana-sexp)))
+                ; BUG: lunacies -> scan for some reason gives : (string-append (substring rl 7 8) (substring rl 2 5))
                 ; farmings -> farm only requires 1 substring, so if there is only 1 substring, you dont need string append
                 (define prob (problem "input" quest (~a (if (= 1 (length ranges)) ranges (cons 'string-append ranges))) "Using as <b>FEW</b> string-append's and substring's as possible, e.g: <code>(string-append (substring vr 0 1) ...)</code>" ))
                 (problem->jsexpr prob)]
