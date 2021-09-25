@@ -10,7 +10,7 @@
 
 ; used to pass into eval so + - and other functions are defined
 (define-namespace-anchor anc)
-(define ns (namespace-anchor->namespace anc))
+(define the-namespace (namespace-anchor->namespace anc))
 
 (define alphabet (string->list "abcdefghijklmnopqrstuvwxyz"))
 
@@ -185,9 +185,10 @@
              (cons (ran-exp (ran-exp (ran-bool) (ran-bool)) (ran-exp (ran-bool) (ran-bool))) acc)) empty (range num)))
   (cons (random-ref (list 'and 'or)) res))
 
-; returns a string, number or bool
+; returns a string, number
+; excluding bool because it pritns them weirdly, e.g #t/#f while seralizing them to an answer is true or false
 (define (ran-data)
-  (random-ref (list (random 1 10) (random-string 4) (ran-bool))))
+  (random-ref (list (random 1 10) (random-string 4))))
 
 ; returns a random list of data guarnteeing booleans not to be equal
 (define (ran-data-unique)
@@ -197,6 +198,7 @@
   (if (and are-bools? (and a b))
       (ran-data-unique)
       (list a b)))
+
 ;; command line parser
 (define parser
   (command-line
@@ -224,11 +226,30 @@
   (cond [(= (disable-prism) 0) (wrap-html str)]
         [else str]))
 
+; given a number produces a random jurble of letters
+; (ran-chars 4) -> "afbz"
+; WHEN GENERATING RANDOM VARIABLE NAMES, HAVE IT BE 1 LETTER OR 4, NOT 2 BECAUSE IT COULD GENRATE KEYWORDS LIKE "IF"
+(define (ran-chars num)
+  (list->string
+   (map (lambda (_)
+          (random-ref alphabet)) (range num))))
+
+; produces a list of random garbled strings and makes sure they're unique:
+; (list "ab" "cd")
+; WARNING! do not generate 2 letter random words for random variable names because it could generate keywords like "if"
+(define (ran-strings-unique numchars amount)
+  (define (aux item acc)
+    (cond [(= (length acc) amount) acc]
+          [(member item acc) (aux (ran-chars numchars) acc)]
+          [else
+           (aux (ran-chars numchars) (cons item acc))]))
+  (aux (ran-chars numchars) empty))
+
 ; Number -> JSON
 (define (gen-exercise mn)
   (cond
     [(= 0 mn) (define ranmath (gen-ran-arith-problem 5))
-              (define prob (problem "input" (wrap-prism-js (~a ranmath)) (eval ranmath ns) "input a number eg 42" ))
+              (define prob (problem "input" (wrap-prism-js (~a ranmath)) (eval ranmath the-namespace) "input a number eg 42" ))
               (problem->jsexpr prob)]
     [(= 2.1 mn) (define ranmath (gen-ran-arith-problem 2))
                 (define infixed (infix ranmath))
@@ -243,7 +264,7 @@
                 (define quest (map (lambda (v)
                                      (string-append (~a v) "\n")) ranmath))
                 ; (println quest)
-                (define ans (eval (cons 'begin ranmath) ns))
+                (define ans (eval (cons 'begin ranmath) the-namespace))
                 (define prob (problem "input" (wrap-prism-js
                                                (string-append "; What number does line 6 evaluate to? \n"
                                                               (foldr string-append "" quest))) ans "input a number eg: 42" ))
@@ -258,7 +279,7 @@
                 (define orig-wd (car q&a))
                 (define ana-list (cadr q&a))
                 (define rand-ana (list-ref ana-list (random (length ana-list))))
-                (define ran-var-name (string->symbol (string (random-ref alphabet) (random-ref alphabet))))
+                (define ran-var-name (string->symbol (ran-chars 4)))
                 (define quest (string-append
                                (wrap-prism-js (string-append "; Build the string: \"" rand-ana "\", from: \n"
                                                              "(define " (symbol->string ran-var-name) " \"" orig-wd "\")"))))
@@ -266,7 +287,7 @@
                 (define ranges (map (lambda (v)
                                       (cond [(number? v) (list 'substring ran-var-name v (add1 v))]
                                             [else (list 'substring ran-var-name (car v) (add1 (cdr v)))])) (rangify ana-sexp)))
-                ; BUG: lunacies -> scan for some reason gives : (string-append (substring rl 7 8) (substring rl 2 5))
+                ; BUG(fixed but be warned): lunacies -> scan for some reason gives : (string-append (substring rl 7 8) (substring rl 2 5))
                 ; farmings -> farm only requires 1 substring, so if there is only 1 substring, you dont need string append
                 (define prob (problem "input" quest (~a (if (= 1 (length ranges)) ranges (cons 'string-append ranges))) "Using as <b>FEW</b> string-append's and substring's as possible, e.g: <code>(string-append (substring vr 0 1) ...)</code>" ))
                 (problem->jsexpr prob)]
@@ -275,13 +296,131 @@
 
      (define branches (ran-data-unique))
      (define quest (list 'if (bool-exp (random 0 3)) (car branches) (cadr branches)))
-     (define prob (problem "input" (wrap-prism-js (~a quest)) (eval quest ns) "evaluate and input a quoted \"string\", number or boolean(true, false)" ))
+     (define prob (problem "input" (wrap-prism-js (~a quest)) (eval quest the-namespace) "evaluate and input a quoted <code>\"string\", number or boolean(true, false)</code>"))
      (problem->jsexpr prob)
      ]
     [(= 2.6 mn)
      ; answer is a math exp that needs to be evaluated
      (define quest (list 'if (ran-logical 2) (gen-ran-arith-problem 2) (gen-ran-arith-problem 2)))
-     (define prob (problem "input" (wrap-prism-js (~a quest)) (eval quest ns) "input a number eg 42" ))
+     (define prob (problem "input" (wrap-prism-js (~a quest)) (eval quest the-namespace) "input a number eg 42" ))
+     (problem->jsexpr prob)
+     ]
+    [(= 2.7 mn)
+     ; practice scope and evaluating a function, e.g having a global constant variable vs local
+     ; and recognizing when variables are not even used within the function
+     #|
+    (define gg 1)
+    (define (f gg hh zz bb)
+      (+ gg hh)) ; should randomly choose whether to use the variable or not
+    (f gg 2 3 4) ; randomly use a variable in global scope
+    |#
+
+     (define random-names (map string->symbol (ran-strings-unique 1 (random 5 7))))
+     (define fname (car random-names))
+     (define var-names (cdr random-names))
+     ; aka locals
+     (define func-arg-names (take var-names (random 1 (length var-names)))) ; pick random amount of variable names, some of which may already be in global 
+     ; globals cant be random-ref because it will multi-invalid-define
+
+     ; take backawards!
+     (define globals (map (lambda (val)
+                            (list 'define val (1-10))) (take (reverse var-names) (random 2 (length var-names)))))
+
+     (define global-var-names (map cadr globals))
+     (define locals-and-globals (append global-var-names func-arg-names))
+     ;(println (list var-names global-var-names func-arg-names))
+     ; local, global or constant??
+     (define func-body `(,(random-ref '(+ -)) ,@(map (lambda (val) (if (ran-bool) val (1-10))) locals-and-globals)))
+     ; need to randomize the local variable as well?
+     (define func-header (list 'define `(,fname ,@func-arg-names)))
+     (define func-call `(,fname
+                         ,@(map (lambda (_)
+                                  (random-ref
+                                   (list
+                                    (1-10)
+                                    (cadr (random-ref globals))
+                                    (list (random-ref (list '+ '-)) (1-10) (1-10)))))
+                                (range (length func-arg-names)))))
+
+     (define func-combined (append func-header (list func-body)))
+     (define quest `(,@globals ,func-combined ,func-call))
+     ;(println quest)
+     (define ans (eval (cons 'begin quest) the-namespace))
+     (define prob (problem "input"
+                           (wrap-prism-js
+                            (string-append "; What the function call evaluate to? \n"
+                                           (foldr string-append ""
+                                                  (map (lambda (v)
+                                                         (string-append (~a v) "\n")) quest)))) ans "input a number eg: 42" ))
+     (problem->jsexpr prob)]
+    [(= 2.8)
+     ; functions calling a function, and scope resolving
+     #|
+    (define gg 1)
+    (define (x ab cd ef) (+ 1 ab)) ; random
+    (define (f gg hh zz bb)
+      (+ gg hh (x gg hh zz ))) ; should randomly choose whether to use the variable or not
+    (f gg 2 3 4) ; randomly use a variable in global scope
+    |#
+    ; TODO: REFACTOR ALL OF THIS TO BE ABLE TO GENERATE N AMOUNT OF FUNCTIONS
+     ; first two will be func names, rest are local/global names
+     (define random-names (map string->symbol (ran-strings-unique 1 (random 5 7))))
+     (define fname (car random-names))
+     (define fname2 (cadr random-names))
+     (define var-names (cdr (cdr random-names)))
+
+     (define globals (map (lambda (val)
+                            (list 'define val (1-10))) (take (reverse var-names) (random 2 (length var-names)))))
+
+     (define global-var-names (map cadr globals))
+
+     (define func-arg-names2 (take var-names (random 1 (length var-names)))) ; pick random amount of variable names, some of which may already be in global
+
+     (define locals-and-globals2 (append global-var-names func-arg-names2))
+
+     (define func-header2 (list 'define (cons fname2 func-arg-names2)))
+
+     (define func-body2 `(,(random-ref '(+ -))
+                         ,@(map
+                            (lambda (val)
+                              (define choice (random 0 2))
+                              (cond [(= choice 0) (1-10)]
+                                    [(= choice 1) val]
+                                    )) locals-and-globals2)))
+
+     (define func-arg-names (take var-names (random 1 (length var-names)))) ; pick random amount of variable names, some of which may already be in global
+     (define locals-and-globals (append global-var-names func-arg-names))
+
+     (define func-body `(,(random-ref '(+ -))
+                         ,@(map
+                            (lambda (val)
+                              (define choice (random 0 3))
+                              (cond [(= choice 0) (1-10)]
+                                    [(= choice 1) val]
+                                    [else (flatten (list fname2 (build-list (length func-arg-names2) (lambda (_) (1-10)))))] ; func call
+                                    )) locals-and-globals)))
+
+     (define func-header (list 'define (cons fname func-arg-names)))
+
+     (define func-call `(,fname
+                         ,@(map (lambda (_)
+                                  (random-ref
+                                   (list
+                                    (1-10)
+                                    (cadr (random-ref globals))
+                                    (list (random-ref (list '+ '-)) (1-10) (1-10)))))
+                                (range (length func-arg-names)))))
+
+     (define func-combined (append func-header (list func-body)))
+     (define func-combined2 (append func-header2 (list func-body2)))
+     (define quest `(,@globals ,func-combined2 ,func-combined ,func-call))
+     (define ans (eval (cons 'begin quest) the-namespace))
+     (define prob (problem "input"
+                           (wrap-prism-js
+                            (string-append "; What the function call evaluate to? \n"
+                                           (foldr string-append ""
+                                                  (map (lambda (v)
+                                                         (string-append (~a v) "\n")) quest)))) ans "input a number eg: 42" ))
      (problem->jsexpr prob)
      ]
     [else

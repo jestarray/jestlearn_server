@@ -103,7 +103,6 @@ function archive(problem, user_id, course_name) {
   let insert_problem = db.prepare(
     `INSERT INTO archive (title, id, problem_index, problems, emoji_mark, last_updated, user_id, course_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   );
-  //console.log(problem, user_id);
   for (let item of problem) {
     insert_problem.run(
       item.title,
