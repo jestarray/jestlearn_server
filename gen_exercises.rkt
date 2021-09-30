@@ -351,7 +351,7 @@
      (define ans (eval (cons 'begin quest) the-namespace))
      (define prob (problem "input"
                            (wrap-prism-js
-                            (string-append "; What the function call evaluate to? \n"
+                            (string-append "; What does the the function call on the last line evaluate to? \n"
                                            (foldr string-append ""
                                                   (map (lambda (v)
                                                          (string-append (~a v) "\n")) quest)))) ans "input a number eg: 42" ))
@@ -420,7 +420,7 @@
      (define ans (eval (cons 'begin quest) the-namespace))
      (define prob (problem "input"
                            (wrap-prism-js
-                            (string-append "; What the function call evaluate to? \n"
+                            (string-append "; What does the function call on the last line evaluate to? \n"
                                            (foldr string-append ""
                                                   (map (lambda (v)
                                                          (string-append (~a v) "\n")) quest)))) ans "input a number eg: 42" ))
