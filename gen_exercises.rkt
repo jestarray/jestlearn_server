@@ -15,10 +15,17 @@
 (define alphabet (string->list "abcdefghijklmnopqrstuvwxyz"))
 
 ; Number -> String
-(define (random-string len [add-quotes? #t])
+; when using this to generate variable names, call with (random-string 1 #f #f)
+; length should be 1 to not conflict with keywords like cond, if, let , incase the rng does gen these
+; add-quotes? is because this needs to be spit out as a json string for html
+(define (random-string len [add-quotes? #t] [ran-caps #f])
   (define res
     (list->string
-     (map (lambda (_) (random-ref alphabet)) (range len))))
+     (map (lambda (_)
+            (define v (random-ref alphabet))
+            (if (and ran-caps (ran-bool))
+                (char-upcase v)
+                v)) (range len))))
   (cond [add-quotes? (string-append "\"" res "\"")]
         [else res]))
 ; Answer is:
@@ -153,7 +160,7 @@
   (define string-comp 1)
   (define arith 2)
   (define comps '(< > <= >= =))
-  (define bool-exp
+  (define exp
     (cond
       [(= ran-choice typeof) (list (random-ref '(string? number?)) (random-ref (list (random 100) (random-string 4))))]
       [(= ran-choice string-comp)
@@ -165,7 +172,7 @@
              (random-ref (list (list 'string-length (random-string (random 1 10))) (gen-ran-arith-problem 2)))
              (random-ref (list (list 'string-length (random-string (random 1 10))) (gen-ran-arith-problem 2))))]
       ))
-  bool-exp)
+  exp)
 
 ; Number -> List<Symbols>
 ; generates a list of randomly nested logical ops, and or not
@@ -185,19 +192,23 @@
              (cons (ran-exp (ran-exp (ran-bool) (ran-bool)) (ran-exp (ran-bool) (ran-bool))) acc)) empty (range num)))
   (cons (random-ref (list 'and 'or)) res))
 
-; returns a string, number
-; excluding bool because it pritns them weirdly, e.g #t/#f while seralizing them to an answer is true or false
-(define (ran-data)
-  (random-ref (list (random 1 10) (random-string 4))))
+; List<String|Number, String|Number>
+; returns a list of length 2 of random date
+; uppercase??
+(define (ran-data-unique amount [range 10] [string-len 1] [ran-caps #f])
+  ; returns a string, number
+  ; excluding bool because it prints them weirdly, e.g #t/#f while seralizing them to an answer is true or false
+  (define (ran-data)
+    (random-ref (list (random 1 range) (random-string string-len #t ran-caps))))
 
-; returns a random list of data guarnteeing booleans not to be equal
-(define (ran-data-unique)
-  (define a (ran-data))
-  (define b (ran-data))
-  (define are-bools? (and (boolean? a) (boolean? b)))
-  (if (and are-bools? (and a b))
-      (ran-data-unique)
-      (list a b)))
+  (define (aux count acc)
+    (cond [(= count 0) acc]
+          [else
+           (define r (ran-data))
+           (if (member r acc)
+               (aux count acc)
+               (aux (- count 1) (cons r acc)))]))
+  (aux amount empty))
 
 ;; command line parser
 (define parser
@@ -226,24 +237,16 @@
   (cond [(= (disable-prism) 0) (wrap-html str)]
         [else str]))
 
-; given a number produces a random jurble of letters
-; (ran-chars 4) -> "afbz"
-; WHEN GENERATING RANDOM VARIABLE NAMES, HAVE IT BE 1 LETTER OR 4, NOT 2 BECAUSE IT COULD GENRATE KEYWORDS LIKE "IF"
-(define (ran-chars num)
-  (list->string
-   (map (lambda (_)
-          (random-ref alphabet)) (range num))))
-
 ; produces a list of random garbled strings and makes sure they're unique:
 ; (list "ab" "cd")
 ; WARNING! do not generate 2 letter random words for random variable names because it could generate keywords like "if"
 (define (ran-strings-unique numchars amount)
   (define (aux item acc)
     (cond [(= (length acc) amount) acc]
-          [(member item acc) (aux (ran-chars numchars) acc)]
+          [(member item acc) (aux (random-string numchars #f) acc)]
           [else
-           (aux (ran-chars numchars) (cons item acc))]))
-  (aux (ran-chars numchars) empty))
+           (aux (random-string numchars #f) (cons item acc))]))
+  (aux (random-string numchars #f) empty))
 
 ; Number -> JSON
 (define (gen-exercise mn)
@@ -279,7 +282,7 @@
                 (define orig-wd (car q&a))
                 (define ana-list (cadr q&a))
                 (define rand-ana (list-ref ana-list (random (length ana-list))))
-                (define ran-var-name (string->symbol (ran-chars 4)))
+                (define ran-var-name (string->symbol (random-string 1 #f #f)))
                 (define quest (string-append
                                (wrap-prism-js (string-append "; Build the string: \"" rand-ana "\", from: \n"
                                                              "(define " (symbol->string ran-var-name) " \"" orig-wd "\")"))))
@@ -294,7 +297,7 @@
     [(= 2.5 mn)
      ;answer is a random data type, keep it simple cause in 2.6 we will make the answers harder
 
-     (define branches (ran-data-unique))
+     (define branches (ran-data-unique 2 10 4 #t))
      (define quest (list 'if (bool-exp (random 0 3)) (car branches) (cadr branches)))
      (define prob (problem "input" (wrap-prism-js (~a quest)) (eval quest the-namespace) "evaluate and input a quoted <code>\"string\", number or boolean(true, false)</code>"))
      (problem->jsexpr prob)
@@ -319,7 +322,7 @@
      (define fname (car random-names))
      (define var-names (cdr random-names))
      ; aka locals
-     (define func-arg-names (take var-names (random 1 (length var-names)))) ; pick random amount of variable names, some of which may already be in global 
+     (define func-arg-names (take var-names (random 1 (length var-names)))) ; pick random amount of variable names, some of which may already be in global
      ; globals cant be random-ref because it will multi-invalid-define
 
      ; take backawards!
@@ -353,7 +356,7 @@
                                                   (map (lambda (v)
                                                          (string-append (~a v) "\n")) quest)))) ans "input a number eg: 42" ))
      (problem->jsexpr prob)]
-    [(= 2.8)
+    [(= 2.8 mn)
      ; functions calling a function, and scope resolving
      #|
     (define gg 1)
@@ -362,7 +365,7 @@
       (+ gg hh (x gg hh zz ))) ; should randomly choose whether to use the variable or not
     (f gg 2 3 4) ; randomly use a variable in global scope
     |#
-    ; TODO: REFACTOR ALL OF THIS TO BE ABLE TO GENERATE N AMOUNT OF FUNCTIONS
+     ; TODO: REFACTOR ALL OF THIS TO BE ABLE TO GENERATE N AMOUNT OF FUNCTIONS
      ; first two will be func names, rest are local/global names
      (define random-names (map string->symbol (ran-strings-unique 1 (random 5 7))))
      (define fname (car random-names))
@@ -381,12 +384,12 @@
      (define func-header2 (list 'define (cons fname2 func-arg-names2)))
 
      (define func-body2 `(,(random-ref '(+ -))
-                         ,@(map
-                            (lambda (val)
-                              (define choice (random 0 2))
-                              (cond [(= choice 0) (1-10)]
-                                    [(= choice 1) val]
-                                    )) locals-and-globals2)))
+                          ,@(map
+                             (lambda (val)
+                               (define choice (random 0 2))
+                               (cond [(= choice 0) (1-10)]
+                                     [(= choice 1) val]
+                                     )) locals-and-globals2)))
 
      (define func-arg-names (take var-names (random 1 (length var-names)))) ; pick random amount of variable names, some of which may already be in global
      (define locals-and-globals (append global-var-names func-arg-names))
@@ -423,6 +426,74 @@
                                                          (string-append (~a v) "\n")) quest)))) ans "input a number eg: 42" ))
      (problem->jsexpr prob)
      ]
+    [(= 2.9 mn)
+     (define random-names (map string->symbol (ran-strings-unique 1 10)))
+     (define-values (s1 s2) (split-at random-names 5))
+     (define s1-name (car s1))
+     (define s2-name (car s2))
+     (define s1-field-names (cdr s1))
+     (define s2-field-names (cdr s2))
+     (define all-values (ran-data-unique 8 10 1 #t))
+     (define-values (s1-vals s2-vals) (split-at all-values 4))
+     (define s1-constructor (string->symbol (string-append "make-" (symbol->string s1-name))))
+     (define s2-constructor (string->symbol (string-append "make-" (symbol->string s2-name))))
+     (define s1-instance `(,s1-constructor ,@s1-vals))
+     (define s2-instance `(,s2-constructor ,@s2-vals))
+
+     ; random upppercase to force them to use operators on the result of accessing it?
+     ; mix numbers into it to force number->string?
+     (define quest
+       `((define-struct ,s1-name ,s1-field-names)
+         (define-struct ,s2-name ,s2-field-names)
+         (define i1 ,s1-instance)
+         (define i2 ,s2-instance)))
+     (define ran-s1-indexes (build-list 2 (lambda (_) (random 0 (sub1 (length s1-vals))))))
+     (define ran-s2-indexes (build-list 2 (lambda (_) (random 0 (sub1 (length s2-vals))))))
+
+     ; String | Number -> String
+     ; if the string is quoted, remove the quotes
+     (define (normalize-to-string item)
+       (cond [(string? item) (substring item 1 (sub1 (string-length item)))]
+             [else (number->string item)]))
+
+     (define build-this
+       (apply string-append
+              (map (lambda (i1 i2)
+                     (define v1 (list-ref s1-vals i1))
+                     (define v2 (list-ref s2-vals i2))
+                     (string-append
+                      (normalize-to-string v1)
+                      (normalize-to-string v2))) ran-s1-indexes ran-s2-indexes)))
+     (define _ans-exps
+       (map (lambda (i1 i2)
+              (define v1 (list-ref s1-vals i1))
+              (define v2 (list-ref s2-vals i2))
+
+              (define (wrap-convert item inner)
+                (cond [(string? item) inner]
+                      [else (list 'number->string inner)]))
+
+              (define f1 (list-ref s1-field-names i1))
+              (define f2 (list-ref s2-field-names i2))
+              (define s1-accessor (string->symbol (string-append (symbol->string s1-name) "-" (symbol->string f1))))
+              (define s2-accessor (string->symbol (string-append (symbol->string s2-name) "-" (symbol->string f2))))
+              (define extract1 (list s1-accessor 'i1))
+              (define extract2 (list s2-accessor 'i2))
+              (list (wrap-convert v1 extract1) (wrap-convert v2 extract2))) ran-s1-indexes ran-s2-indexes))
+     ; use max 2-4 fields
+     (define ans `(string-append ,@(car _ans-exps) ,@(cadr _ans-exps)))
+     ; (println (list quest ans build-this))
+     (define prob (problem "input"
+                           (wrap-prism-js
+                            (string-append (string-append "; BUILD THE STRING: \"" build-this "\"\n")
+                                           (foldr string-append ""
+                                                  (map (lambda (v)
+                                                         (string-append (~a v) "\n")) quest))))
+                           (~a ans) "example answer: <code>(string-append ...)</code>"))
+     ;(println (list q-exp ran-s1-indexes ran-s2-indexes build-this ans-exp))
+     (problem->jsexpr prob)]
+    ; TODO: collage, recursively call this function X amount of times for test on these basics,
+    ; 20 question challenge
     [else
      ; (println "invalid exercise id, defaulting to 0")
      (gen-exercise 0)]))
