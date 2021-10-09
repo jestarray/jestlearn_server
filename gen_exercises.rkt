@@ -447,8 +447,8 @@
          (define-struct ,s2-name ,s2-field-names)
          (define i1 ,s1-instance)
          (define i2 ,s2-instance)))
-     (define ran-s1-indexes (build-list 2 (lambda (_) (random 0 (sub1 (length s1-vals))))))
-     (define ran-s2-indexes (build-list 2 (lambda (_) (random 0 (sub1 (length s2-vals))))))
+     (define ran-s1-indexes (build-list 2 (lambda (_) (random 0 (length s1-vals)))))
+     (define ran-s2-indexes (build-list 2 (lambda (_) (random 0 (length s2-vals)))))
 
      ; String | Number -> String
      ; if the string is quoted, remove the quotes
