@@ -11,8 +11,7 @@ db.prepare(
   `CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		username TEXT UNIQUE,
-		date_created INTEGER,
-		ip_address TEXT
+		date_created INTEGER
 		);`
 ).run();
 
@@ -157,7 +156,7 @@ function diff_latest(set_a, set_b) {
 app.post("/sync", (req, res) => {
   let query = get_user_data(req.body.username);
   let problems_from_client = req.body.problem_sets;
-  console.log(req.body);
+  //console.log(req.body);
   let course_name = req.body.course_name;
   if (query !== undefined) {
     //the user exists so resolve diffs between the sent client data and the server save data based on timestamsp
@@ -196,10 +195,10 @@ app.post("/sync", (req, res) => {
   } else {
     //first time creating an account!
     let new_user = db.prepare(
-      `INSERT INTO users (username, date_created, ip_address) VALUES (?, ?, ?)`
+      `INSERT INTO users (username, date_created) VALUES (?, ?)`
     );
     let account_creation_date = Date.now();
-    new_user.run(req.body.username, account_creation_date, req.ip);
+    new_user.run(req.body.username, account_creation_date);
     let userinfo = get_user_data(req.body.username);
     if (problems_from_client !== undefined) {
       insert_problem_data(problems_from_client, userinfo.id, course_name);
