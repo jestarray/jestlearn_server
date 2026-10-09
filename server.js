@@ -1,21 +1,40 @@
+require("dotenv").config();
 var express = require("express");
-let PORT = 3000;
+let PORT = process.env.PORT || 3000;
 var cors = require("cors");
 var app = express();
 const util = require("util");
 const execFile = util.promisify(require("child_process").execFile);
-const db = require("better-sqlite3")("save.db", { verbose: console.log });
-db.pragma("journal_mode = WAL");
+const { DatabaseSync } = require("node:sqlite");
+const db = new DatabaseSync(process.env.DB_FILE || "save.db");
+db.exec("PRAGMA journal_mode = WAL;");
 
-db.prepare(
+// node:sqlite only binds null, number, bigint, string and Uint8Array, and throws on
+// undefined. better-sqlite3 bound undefined as NULL, so normalise missing values to
+// null here to keep the same behaviour for optional fields such as course_name.
+function prepare(sql) {
+  const statement = db.prepare(sql);
+  const bind = (method) => (...params) =>
+    method.apply(
+      statement,
+      params.map((param) => (param === undefined ? null : param))
+    );
+  return {
+    run: bind(statement.run),
+    get: bind(statement.get),
+    all: bind(statement.all),
+  };
+}
+
+db.exec(
   `CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		username TEXT UNIQUE,
 		date_created INTEGER
 		);`
-).run();
+);
 
-db.prepare(
+db.exec(
   `CREATE TABLE IF NOT EXISTS problemset (
 		title TEXT,
 		id INTEGER,
@@ -27,9 +46,9 @@ db.prepare(
 		course_name TEXT,
 		UNIQUE(id, user_id) ON CONFLICT REPLACE
 		);`
-).run();
+);
 
-db.prepare(
+db.exec(
   `CREATE TABLE IF NOT EXISTS archive (
 		title TEXT,
 		id INTEGER,
@@ -40,7 +59,7 @@ db.prepare(
 		user_id INTEGER,
 		course_name TEXT
 		);`
-).run();
+);
 
 app.use(cors());
 app.use(express.json());
@@ -49,13 +68,20 @@ app.use(express.urlencoded({ extended: true }));
 //todo: maybe jsut merge thi all into jestlearn instead of splitting this up into a seperate project
 //since they're both probably going to share the data.ts file which contains the table of contents
 
-//https://github.com/JoshuaWise/better-sqlite3
-app.listen(PORT, () => {
+//https://nodejs.org/api/sqlite.html
+//express 5 passes listen errors (e.g. EADDRINUSE) to this callback instead of
+//throwing them, so handle them explicitly.
+app.listen(PORT, (error) => {
+  if (error) {
+    console.error(`Failed to start server on port ${PORT}:`, error.message);
+    process.exitCode = 1;
+    return;
+  }
   console.log(`Server running on port ${PORT}`);
 });
 
 function get_user_data(username) {
-  let find_user = db.prepare(
+  let find_user = prepare(
     `SELECT id, username, date_created FROM users WHERE username = ?`
   );
   let data = find_user.get(username);
@@ -63,7 +89,7 @@ function get_user_data(username) {
 }
 
 function get_all_problem_data(id, course_name) {
-  let find_problemset_data = db.prepare(
+  let find_problemset_data = prepare(
     `SELECT * FROM problemset WHERE user_id = ? AND course_name = ?`
   );
   let fetched = find_problemset_data.all(id, course_name);
@@ -79,7 +105,7 @@ function get_all_problem_data(id, course_name) {
 //problem is [ProblemSet]}
 function insert_problem_data(problem, user_id, course_name) {
   //todo: check if there are any current problems and resolve the diff via time stamps in another function
-  let insert_problem = db.prepare(
+  let insert_problem = prepare(
     `INSERT OR REPLACE INTO problemset (title, id, problem_index, problems, emoji_mark, last_updated, user_id, course_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   );
   //console.log(problem, user_id);
@@ -99,7 +125,7 @@ function insert_problem_data(problem, user_id, course_name) {
 
 function archive(problem, user_id, course_name) {
   //todo: check if there are any current problems and resolve the diff via time stamps in another function
-  let insert_problem = db.prepare(
+  let insert_problem = prepare(
     `INSERT INTO archive (title, id, problem_index, problems, emoji_mark, last_updated, user_id, course_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (let item of problem) {
@@ -154,6 +180,13 @@ function diff_latest(set_a, set_b) {
 }
 
 app.post("/sync", (req, res) => {
+  //express 5 leaves req.body undefined when no body was parsed (express 4 used
+  //{}), and a parsed-but-empty body still has no username. Without this check the
+  //first-time-account branch below would insert a user with a null username.
+  if (req.body === undefined || req.body.username === undefined || req.body.username === null) {
+    res.status(400).send({ error: "username is required." });
+    return;
+  }
   let query = get_user_data(req.body.username);
   let problems_from_client = req.body.problem_sets;
   //console.log(req.body);
@@ -194,7 +227,7 @@ app.post("/sync", (req, res) => {
     //diff the client and server save
   } else {
     //first time creating an account!
-    let new_user = db.prepare(
+    let new_user = prepare(
       `INSERT INTO users (username, date_created) VALUES (?, ?)`
     );
     let account_creation_date = Date.now();
@@ -230,7 +263,6 @@ let courses_on_this_site = [
 let hosted = courses_on_this_site.map((val) => {
   //host the courses on their respective root paths
   app.use(`/${convert_to_hash(val.course_name)}`, express.static(val.path));
-  const test_url = "http://localhost:3000";
   const prod_url = "https://jestlearn.com";
   return `<li><a href="${prod_url}/${convert_to_hash(val.course_name)}/">${
     val.course_name
@@ -238,7 +270,7 @@ let hosted = courses_on_this_site.map((val) => {
 });
 
 async function get_exercise(id = 0, amount = 1) {
-  const { error, stdout, stderr } = await execFile("./gen_exercises", [
+  const { stdout } = await execFile("./gen_exercises", [
     `--exercise`,
     `${id}`,
     `--amount`,
