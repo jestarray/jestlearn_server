@@ -6,7 +6,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon server.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "build:howtocode": "node scripts/build_howtocode.mjs",
+    "build": "npm run build:howtocode"
   },
   "author": "",
   "license": "ISC",

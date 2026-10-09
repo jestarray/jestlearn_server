@@ -2,3 +2,10 @@ node_modules/
 save.db
 save.db-wal
 save.db-shm
+
+# published course build: generated from the jestlearn submodule sources by
+# `npm run build:howtocode`, never committed. See README.md. The directory is
+# gitignored wholesale (no .gitkeep: the publisher recreates it, and its atomic
+# swap would delete a placeholder anyway).
+howtocode/
+howtocode.staging/

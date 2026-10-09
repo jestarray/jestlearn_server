@@ -18,10 +18,43 @@ git clone jestlearn_server.git
 ```
 cd jestlearn_server
 npm install
+npm run build:howtocode   # generates the /how_to_code/ course (see below)
 npm start (or whatever your start command)
 # stop app
 ctrl+C
 ```
+
+## Publishing a course build
+
+The courses served from this server are static builds:
+
+| URL | Served from | Source |
+| --- | --- | --- |
+| `/example_course/` | `jestlearn/dist` | jestlearn submodule |
+| `/computer_systems/` | `computer_systems_public/` | no source in this repo (committed output) |
+| `/how_to_code/` | `howtocode/` | jestlearn submodule, built by `npm run build:howtocode` |
+
+`howtocode/` is a **generated** directory and is gitignored. Do not commit it and
+do not edit it by hand: it is a copy of the `jestlearn` submodule's `dist/`
+output, so any manual change is overwritten by the next build. The publisher
+builds from source, verifies that `dist/index.html` exists, and then swaps the
+result into place atomically, so a failed build cannot empty out a working
+directory.
+
+To ship a new version of the course, bump the submodule and rebuild:
+
+```
+git submodule update --init --recursive   # only advances if the pointer moved
+npm run build:howtocode
+pm2 restart server.js
+```
+
+Because `jestlearn` is a submodule, `git pull` alone never advances the course
+code: the submodule pointer is pinned by a commit in this repo. If the course
+looks stale after a pull, that line is the reason.
+
+If `howtocode/` is missing at startup, `server.js` prints which course has no
+build and which command generates it, instead of silently 404ing.
 ## 4. Setup PM2 process manager to keep your app running
 ```
 sudo npm i pm2 -g

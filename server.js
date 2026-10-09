@@ -6,6 +6,7 @@ var app = express();
 const util = require("util");
 const execFile = util.promisify(require("child_process").execFile);
 const { DatabaseSync } = require("node:sqlite");
+const fs = require("node:fs");
 const db = new DatabaseSync(process.env.DB_FILE || "save.db");
 db.exec("PRAGMA journal_mode = WAL;");
 
@@ -269,6 +270,17 @@ let hosted = courses_on_this_site.map((val) => {
     val.course_name
   }</a></li>`;
 });
+
+//howtocode is a generated artifact, not committed source: a fresh clone (or a
+//deploy where the publish step did not run) would otherwise just 404 silently.
+for (const val of courses_on_this_site) {
+  if (!fs.existsSync(val.path)) {
+    console.warn(
+      `warning: course "${val.course_name}" has no build at ${val.path} - ` +
+        `run "npm run build:howtocode" to generate it`
+    );
+  }
+}
 
 async function get_exercise(id = 0, amount = 1) {
   const { stdout } = await execFile("./gen_exercises", [
