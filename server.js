@@ -252,10 +252,10 @@ function convert_to_hash(st) {
   let res = replace_spaces.toLowerCase();
   return res;
 }
-//all we need is the public folders and some unused rootpath
+//all we need is the built course folders and some unused rootpath
 //note: root dir must be synced with the jestlearn COURSE_NAME
 let courses_on_this_site = [
-  { path: "./jestlearn/public", course_name: "Example Course" },
+  { path: "./jestlearn/dist", course_name: "Example Course" },
   { path: "./computer_systems_public", course_name: "Computer Systems" },
   { path: "./howtocode", course_name: "how to code" },
 ];
