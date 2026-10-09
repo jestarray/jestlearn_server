@@ -263,8 +263,9 @@ let courses_on_this_site = [
 let hosted = courses_on_this_site.map((val) => {
   //host the courses on their respective root paths
   app.use(`/${convert_to_hash(val.course_name)}`, express.static(val.path));
-  const prod_url = "https://jestlearn.com";
-  return `<li><a href="${prod_url}/${convert_to_hash(val.course_name)}/">${
+  //relative href so the index works on whatever host served it (localhost, a
+  //staging domain, jestlearn.com) instead of always advertising the prod domain
+  return `<li><a href="/${convert_to_hash(val.course_name)}/">${
     val.course_name
   }</a></li>`;
 });
